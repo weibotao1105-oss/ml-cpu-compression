@@ -2,7 +2,7 @@
 
 ## Goal
 
-Update the repository README so it accurately describes the project, the current educational CNN milestone, how to run the code, and the remaining FP32-to-INT8 experiment roadmap.
+Update the repository README and daily research log so they accurately describe the project, the current educational CNN milestone, how to run the code, and the remaining FP32-to-INT8 experiment roadmap.
 
 ## Audience and language
 
@@ -32,6 +32,10 @@ The refreshed README will contain:
 - Fix spelling, Markdown list formatting, and outdated repository-structure claims in the existing README.
 - Do not change source code, dependency versions, or experiment behavior as part of this documentation update.
 
+## Daily log update
+
+Add an English Day 2 entry to `daily-log.md` that records the implemented layer-by-layer CNN, loss and gradient inspection, SGD weight updates, two training epochs, and training-set accuracy calculation. Do not record numerical results that are not stored in the repository.
+
 ## Verification
 
 Before committing the README, verify that:
@@ -44,4 +48,4 @@ Before committing the README, verify that:
 
 ## Delivery
 
-After approval of this design, create an implementation plan, update `README.md`, run proportionate checks, commit all current changes on `main`, and push `main` to `origin` without force-pushing.
+After approval of this design, create an implementation plan, update `README.md` and `daily-log.md`, run proportionate checks, commit all current changes on `main`, and push `main` to `origin` without force-pushing.

@@ -1,6 +1,7 @@
 import torch
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
+from model import SmallCNN
 
 # Scale -> /255
 transform = transforms.ToTensor()
@@ -16,6 +17,20 @@ train_loader = DataLoader(
     train_dataset,
     batch_size=4,
     shuffle=True
+)
+
+# 创建 test_dataset
+test_dataset = datasets.CIFAR10(
+    root="./data",
+    train=False,
+    download=True,
+    transform=transform
+)
+
+test_loader = DataLoader(
+    test_dataset,
+    batch_size=4,
+    shuffle=False
 )
 
 images, labels = next(iter(train_loader))
@@ -53,93 +68,102 @@ plt.imshow(image)
 plt.title(label_names[0])
 plt.show()
 
-# Let these 4 images go through the first layer of CNN
 import torch.nn as nn
 
-conv1 = nn.Conv2d(
-    in_channels=3,
-    out_channels=8, # CNN 第一层里有8个不同的filter，每一个filter代表一种观察方式，最终输出为8个新的feature maps
-    kernel_size=3,  # 每次只看图片中的一个3*3区域
-    padding=1
-)
 
-conv_output = conv1(images)
+# # Let these 4 images go through the first layer of CNN
+# torch.manual_seed(42)
 
-# 添加ReLU激活函数
-relu = nn.ReLU()
+# conv1 = nn.Conv2d(
+#     in_channels=3,
+#     out_channels=8, # CNN 第一层里有8个不同的filter，每一个filter代表一种观察方式，最终输出为8个新的feature maps
+#     kernel_size=3,  # 每次只看图片中的一个3*3区域
+#     padding=1
+# )
 
-activated_output = relu(conv_output)
+# conv_output = conv1(images)
 
-print("Before ReLU min:", conv_output.min().item())
-print("After ReLU min:", activated_output.min().item())
+# # 添加ReLU激活函数
+# relu = nn.ReLU()
 
-print("Before ReLU example:", conv_output[0, 0, 0, 0].item())
-print("After ReLU example:", activated_output[0, 0, 0, 0].item())
+# activated_output = relu(conv_output)
 
-# 添加Max Pooling，压缩feature maps
-pool = nn.MaxPool2d(kernel_size=2, stride=2)
+# print("Before ReLU min:", conv_output.min().item())
+# print("After ReLU min:", activated_output.min().item())
 
-pooled_output = pool(activated_output)
+# print("Before ReLU example:", conv_output[0, 0, 0, 0].item())
+# print("After ReLU example:", activated_output[0, 0, 0, 0].item())
 
-print("Before pooling:", activated_output.shape)
-print("After pooling:", pooled_output.shape)
+# # 添加Max Pooling，压缩feature maps
+# pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
-# 加第二个convolution layer
+# pooled_output = pool(activated_output)
 
-conv2 = nn.Conv2d(
-    in_channels=8,
-    out_channels=16,
-    kernel_size=3,
-    padding=1
-)
+# print("Before pooling:", activated_output.shape)
+# print("After pooling:", pooled_output.shape)
 
-conv2_output = conv2(pooled_output)
+# # 加第二个convolution layer
 
-print("Before conv2:", pooled_output.shape)
-print("After conv2:", conv2_output.shape)
+# conv2 = nn.Conv2d(
+#     in_channels=8,
+#     out_channels=16,
+#     kernel_size=3,
+#     padding=1
+# )
 
-# 给第二层添加ReLU
-relu2 = nn.ReLU()
-pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+# conv2_output = conv2(pooled_output)
 
-activated2 = relu2(conv2_output)
-pooled2 = pool2(activated2)
+# print("Before conv2:", pooled_output.shape)
+# print("After conv2:", conv2_output.shape)
 
-print("Before pool2:", activated2.shape)
-print("After pool2:", pooled2.shape)
+# # 给第二层添加ReLU
+# relu2 = nn.ReLU()
+# pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-# Flattened
-flattened = torch.flatten(pooled2, start_dim=1)
+# activated2 = relu2(conv2_output)
+# pooled2 = pool2(activated2)
 
-print("Before flatten:", pooled2.shape)
-print("After flatten:", flattened.shape)
+# print("Before pool2:", activated2.shape)
+# print("After pool2:", pooled2.shape)
 
-# Linear
-# 64 neurons, input vector has 1024 features, so 1024 weights
-fc1 = nn.Linear(
-    in_features=1024,
-    out_features=64
-)
+# # Flattened
+# flattened = torch.flatten(pooled2, start_dim=1)
 
-fc1_output = fc1(flattened)
+# print("Before flatten:", pooled2.shape)
+# print("After flatten:", flattened.shape)
 
-print("Before fc1:", flattened.shape)
-print("After fc1:", fc1_output.shape)
+# # Linear
+# # 64 neurons, input vector has 1024 features, so 1024 weights
+# fc1 = nn.Linear(
+#     in_features=1024,
+#     out_features=64
+# )
 
-# ReLU
-fc1_activated = torch.relu(fc1_output)
+# fc1_output = fc1(flattened)
 
-# Output layer(Into classes)
-fc2 = nn.Linear(
-    in_features=64,
-    out_features=10
-)
+# print("Before fc1:", flattened.shape)
+# print("After fc1:", fc1_output.shape)
 
-output = fc2(fc1_activated)
+# # ReLU
+# fc1_activated = torch.relu(fc1_output)
 
-print("Before fc2:", fc1_activated.shape)
-print("After fc2:", output.shape)
-print("First image output:", output[0])
+# # Output layer(Into classes)
+# fc2 = nn.Linear(
+#     in_features=64,
+#     out_features=10
+# )
+
+# output = fc2(fc1_activated)
+
+# print("Before fc2:", fc1_activated.shape)
+# print("After fc2:", output.shape)
+# print("First image output:", output[0])
+
+# 引入model
+model = SmallCNN()
+
+# Output
+output = model(images)
 
 # Find the class with the max number
 predicted_class = torch.argmax(output, dim=1)
@@ -164,94 +188,128 @@ print("Loss:", loss.item())
 
 # 初始化Optimizer 传入所有相关的weights
 optimizer = torch.optim.SGD(
-    list(conv1.parameters()) +
-    list(conv2.parameters()) +
-    list(fc1.parameters()) +
-    list(fc2.parameters()),
+    model.parameters(),
     lr=0.01  # 步长
 )
 
-# Backpropagation
-loss.backward()
+# # Backpropagation
+# loss.backward()
 
-print("Gradient of one conv1 weight:")
-print(conv1.weight.grad[0, 0, 0, 0])
+# print("Gradient of one conv1 weight:")
+# print(model.conv1.weight.grad[0, 0, 0, 0])
 
-# 修改weights（Pytorch默认会累加gradient，而不是自动覆盖旧gradient)
-weight_before = conv1.weight[0, 0, 0, 0].item()
+# # 修改weights（Pytorch默认会累加gradient，而不是自动覆盖旧gradient)
+# weight_before = model.conv1.weight[0, 0, 0, 0].item()
 
-optimizer.step()
+# optimizer.step()
 
-weight_after = conv1.weight[0, 0, 0, 0].item()
+# weight_after = model.conv1.weight[0, 0, 0, 0].item()
 
-print("Weight before update:", weight_before)
-print("Weight after update:", weight_after)
+# print("Weight before update:", weight_before)
+# print("Weight after update:", weight_after)
 
-# 通过loop来按4张图片一个batch来更新一次weights,一共更新12500次
-print("\nStarting training loop...\n")
-running_loss = 0.0
-for batch_index, (images, labels) in enumerate(train_loader):
+# # 通过loop来按4张图片一个batch来更新一次weights,一共更新12500次
+# print("\nStarting training loop...\n")
+# running_loss = 0.0
+# for batch_index, (images, labels) in enumerate(train_loader):
 
-    optimizer.zero_grad() # 每次都设为0
+#     optimizer.zero_grad() # 每次都设为0
 
-    x = conv1(images)
-    x = torch.relu(x)
-    x = pool(x)
+#     x = conv1(images)
+#     x = torch.relu(x)
+#     x = pool(x)
 
-    x = conv2(x)
-    x = torch.relu(x)
-    x = pool2(x)
+#     x = conv2(x)
+#     x = torch.relu(x)
+#     x = pool2(x)
 
-    x = torch.flatten(x, start_dim=1)
+#     x = torch.flatten(x, start_dim=1)
 
-    x = fc1(x)
-    x = torch.relu(x)
+#     x = fc1(x)
+#     x = torch.relu(x)
 
-    output = fc2(x)
+#     output = fc2(x)
 
-    loss = criterion(output, labels)
+#     loss = criterion(output, labels)
 
-    loss.backward()
+#     loss.backward()
 
-    optimizer.step()
-    running_loss += loss.item()
+#     optimizer.step()
+#     running_loss += loss.item()
 
-average_loss = running_loss / len(train_loader)
+# average_loss = running_loss / len(train_loader)
 
-print("Average loss for 1 epoch:", average_loss)
+# print("Average loss for 1 epoch:", average_loss)
 
-# Second epoch
-running_loss = 0.0
+# # Second epoch
+# running_loss = 0.0
 
-for batch_index, (images, labels) in enumerate(train_loader):
+# for batch_index, (images, labels) in enumerate(train_loader):
 
-    optimizer.zero_grad()
+#     optimizer.zero_grad()
 
-    x = conv1(images)
-    x = torch.relu(x)
-    x = pool(x)
+#     x = conv1(images)
+#     x = torch.relu(x)
+#     x = pool(x)
 
-    x = conv2(x)
-    x = torch.relu(x)
-    x = pool2(x)
+#     x = conv2(x)
+#     x = torch.relu(x)
+#     x = pool2(x)
 
-    x = torch.flatten(x, start_dim=1)
+#     x = torch.flatten(x, start_dim=1)
 
-    x = fc1(x)
-    x = torch.relu(x)
+#     x = fc1(x)
+#     x = torch.relu(x)
 
-    output = fc2(x)
+#     output = fc2(x)
 
-    loss = criterion(output, labels)
+#     loss = criterion(output, labels)
 
-    loss.backward()
-    optimizer.step()
+#     loss.backward()
+#     optimizer.step()
 
-    running_loss += loss.item()
+#     running_loss += loss.item()
 
-average_loss = running_loss / len(train_loader)
+# average_loss = running_loss / len(train_loader)
 
-print("Average loss for epoch 2:", average_loss)
+# print("Average loss for epoch 2:", average_loss)
+
+# Using one for loop to run epoch
+
+num_epochs = 2
+
+for epoch in range(num_epochs):
+
+    running_loss = 0.0
+
+    for images, labels in train_loader:
+
+        optimizer.zero_grad()
+
+        output = model(images)
+
+        loss = criterion(output, labels)
+
+        loss.backward()
+        optimizer.step()
+
+        running_loss += loss.item()
+
+    average_loss = running_loss / len(train_loader)
+
+    print(
+        f"Epoch {epoch + 1}/{num_epochs} "
+        f"Average loss: {average_loss}"
+    )
+
+# 保存模型参数
+
+torch.save(
+    model.state_dict(),
+    "checkpoints/fp32_model.pth"
+)
+
+print("Model saved.")
 
 # Test Accuracy
 # 在之前2个epoch的基础上过一遍模型
@@ -262,20 +320,7 @@ with torch.no_grad():
 
     for images, labels in train_loader:
 
-        x = conv1(images)
-        x = torch.relu(x)
-        x = pool(x)
-
-        x = conv2(x)
-        x = torch.relu(x)
-        x = pool2(x)
-
-        x = torch.flatten(x, start_dim=1)
-
-        x = fc1(x)
-        x = torch.relu(x)
-
-        output = fc2(x)
+        output = model(images)
 
         predicted = torch.argmax(output, dim=1)
 
@@ -287,6 +332,25 @@ accuracy = correct / total
 print("Training accuracy:", accuracy)
 print("Training accuracy (%):", accuracy * 100)
 
+# Test accuracy
+correct = 0
+total = 0
+
+with torch.no_grad(): # 让下面代码在某个临时环境中运行
+
+    for images, labels in test_loader:
+
+        output = model(images)
+
+        predicted = torch.argmax(output, dim=1)
+
+        correct += (predicted == labels).sum().item()
+        total += labels.size(0)
+
+test_accuracy = correct / total
+
+print("Test accuracy (%):", test_accuracy * 100)
+
 # [8, 3, 3, 3]
 #  ↑  ↑  ↑  ↑
 #  |  |  |  |
@@ -295,13 +359,14 @@ print("Training accuracy (%):", accuracy * 100)
 #  |  每个 filter 要看 3 个输入通道（R/G/B）
 #  |
 # 一共有 8 个 filters
-print("Conv weight shape:", conv1.weight.shape)
+print("Conv weight shape:", model.conv1.weight.shape)
 
 # 查看第一个filter的weights，CNN的特点就是所有的filter共享一个权重
 # 起始的Pytorch的weights是随机的，后续通过backpropagation计算出gradient 后通过Optimizer更新
-print(conv1.weight[0])
+print(model.conv1.weight[0])
 # 查看第一个filter对应的bias
-print("Filter 1 bias:", conv1.bias[0])
+print("Filter 1 bias:", model.conv1.bias[0])
+conv_output = model.conv1(images)
 # pixel × weight + bias
 print("First filter, first output value:", conv_output[0, 0, 0, 0])
 # Manual计算验证
@@ -312,8 +377,8 @@ padded_images = F.pad(images, (1, 1, 1, 1))
 patch = padded_images[0, :, 0:3, 0:3]
 
 manual_output = (
-    patch * conv1.weight[0] # 不是矩阵乘法而是27个位置分别相乘然后通过.sum()相加起来
-).sum() + conv1.bias[0]
+    patch * model.conv1.weight[0] # 不是矩阵乘法而是27个位置分别相乘然后通过.sum()相加起来
+).sum() + model.conv1.bias[0]
 
 print("Manual output:", manual_output)
 print("Conv2d output:", conv_output[0, 0, 0, 0])

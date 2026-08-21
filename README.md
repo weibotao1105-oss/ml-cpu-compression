@@ -1,92 +1,78 @@
 # CPU Inference After Neural Network Quantization
 
-## Overview
+## Aim
 
-This learning project investigates whether converting a small image-classification neural network from FP32 to INT8 improves inference latency, throughput, and model size on a standard CPU, and measures any resulting accuracy loss.
+This is a small learning project about running neural networks on a CPU. I am using a CNN trained on CIFAR-10 to compare a normal FP32 model with an INT8 quantized model.
 
-The project currently focuses on building and understanding the FP32 training pipeline before introducing quantization and CPU benchmarks.
-
-## Research question
-
-How does INT8 quantization affect the accuracy, model size, batch-1 latency, and batch-32 throughput of a small CIFAR-10 CNN compared with its FP32 baseline on the same CPU?
+The main question is whether INT8 can reduce model size and improve inference speed without losing too much accuracy.
 
 ## Current progress
 
-The current `src/train.py` is an intentionally verbose learning script. It now demonstrates:
+The FP32 part of the project is now mostly set up:
 
-- Downloading and loading CIFAR-10 with PyTorch.
-- Inspecting image tensors, labels, RGB values, and class names.
-- Building a small CNN layer by layer.
-- Following tensor shapes through convolution, ReLU, max pooling, flattening, and fully connected layers.
-- Computing cross-entropy loss and gradients.
-- Updating weights with SGD.
-- Training for two complete epochs.
-- Calculating accuracy across the 50,000-image training set with gradients disabled.
+- `SmallCNN` is defined as a reusable PyTorch `nn.Module`.
+- `train.py` trains the model for two epochs and saves its weights.
+- Training and test accuracy are calculated separately.
+- `evaluate.py` loads the saved weights and evaluates the test set.
+- The evaluation records test accuracy, model size and parameter count.
+- FP32 results can be saved to `results/fp32_metrics.json`.
 
-Measured test accuracy and CPU performance results are not available yet.
+INT8 quantization and CPU latency benchmarks have not been added yet.
 
-## Current model
+## Model
 
-| Stage | Operation | Output per image |
-| --- | --- | --- |
-| Input | CIFAR-10 RGB image | `3 x 32 x 32` |
-| Feature extraction 1 | `Conv2d(3, 8, 3, padding=1)` + ReLU + `MaxPool2d(2, 2)` | `8 x 16 x 16` |
-| Feature extraction 2 | `Conv2d(8, 16, 3, padding=1)` + ReLU + `MaxPool2d(2, 2)` | `16 x 8 x 8` |
-| Flatten | Flatten feature maps | `1024` |
-| Classifier | `Linear(1024, 64)` + ReLU | `64` |
-| Output | `Linear(64, 10)` | `10` class scores |
+The model is deliberately small so that it is easy to understand and run on a CPU:
 
-Training currently uses cross-entropy loss, SGD with a learning rate of `0.01`, a batch size of `4`, and two epochs.
+```text
+3 x 32 x 32 image
+-> Conv(3, 8) -> ReLU -> MaxPool
+-> Conv(8, 16) -> ReLU -> MaxPool
+-> Flatten
+-> Linear(1024, 64) -> ReLU
+-> Linear(64, 10)
+```
+
+Training currently uses a batch size of `4`, cross-entropy loss, SGD and a learning rate of `0.01`.
 
 ## Setup
 
-The recorded development environment uses Windows 11, Python 3.14.6, CPU-only PyTorch 2.13.0, and Torchvision 0.28.0. See `hardware.md` for full hardware details.
+The recorded environment uses Windows 11, Python 3.14.6 and CPU-only PyTorch 2.13.0.
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+New-Item -ItemType Directory -Force checkpoints, results
 ```
 
-## Run the current training script
+## Run
+
+Train and save the FP32 model first:
 
 ```powershell
 python src/train.py
 ```
 
-On its first run, the script downloads CIFAR-10 into the ignored `data/` directory. It also opens a Matplotlib image window before training continues.
+Then load the checkpoint and evaluate it:
 
-## Repository structure
-
-```text
-.
-|-- src/
-|   |-- train.py       # Current educational CNN and training flow
-|   |-- model.py       # Planned reusable model definition
-|   |-- evaluate.py    # Planned test-set evaluation
-|   |-- quantize.py    # Planned INT8 quantization
-|   `-- benchmark.py   # Planned CPU benchmarks
-|-- configs/           # Planned experiment configurations
-|-- notebooks/         # Exploratory work
-|-- results/           # Generated measurements and figures
-|-- reports/           # Technical reports
-|-- daily-log.md       # Research progress log
-|-- hardware.md        # Recorded experimental environment
-`-- requirements.txt   # Python environment snapshot
+```powershell
+python src/evaluate.py
 ```
 
-## Roadmap
+Both scripts display an example CIFAR-10 image with Matplotlib.
 
-- Refactor the layer-by-layer script into a reusable `nn.Module`.
-- Add held-out CIFAR-10 test-set evaluation.
-- Save and measure the trained FP32 model.
-- Establish FP32 accuracy, model-size, batch-1 latency, and batch-32 throughput baselines.
-- Apply INT8 quantization.
-- Repeat the measurements and compare FP32 with INT8.
+## Main files
 
-## Experiment metrics
+- `src/model.py` - the `SmallCNN` model.
+- `src/train.py` - data loading, training, accuracy checks and checkpoint saving.
+- `src/evaluate.py` - test-set evaluation and FP32 metrics.
+- `src/quantize.py` - planned INT8 quantization work.
+- `src/benchmark.py` - planned CPU benchmark work.
+- `hardware.md` - the machine used for the experiment.
+- `daily-log.md` - short notes on project progress.
 
-- Test accuracy
-- Model size
-- Batch-1 inference latency
-- Batch-32 inference throughput
+## Next steps
+
+- Quantize the FP32 model to INT8.
+- Measure batch-1 latency and batch-32 throughput.
+- Compare FP32 and INT8 accuracy, size and speed.

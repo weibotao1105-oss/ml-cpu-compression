@@ -29,3 +29,21 @@
 - Refactor the learning script into a reusable `nn.Module`.
 - Evaluate the model on the held-out CIFAR-10 test set.
 - Establish the FP32 baseline before applying INT8 quantization.
+
+## Day 3
+
+### Work completed
+
+- Moved the CNN into a reusable `SmallCNN` class in `model.py`.
+- Updated the training script to use the model class and a single epoch loop.
+- Saved the trained FP32 weights as a checkpoint.
+- Added separate training-set and test-set accuracy checks.
+- Added an evaluation script that reloads the checkpoint and uses `model.eval()`.
+- Calculated FP32 model size and parameter count.
+- Added JSON output for the FP32 evaluation metrics.
+
+### Next steps
+
+- Add INT8 quantization.
+- Benchmark FP32 and INT8 inference on the CPU.
+- Compare accuracy, model size, latency and throughput.

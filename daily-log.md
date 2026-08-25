@@ -47,3 +47,23 @@
 - Add INT8 quantization.
 - Benchmark FP32 and INT8 inference on the CPU.
 - Compare accuracy, model size, latency and throughput.
+
+## Day 4
+
+### Work completed
+
+- Recorded the FP32 baseline: 54.1% test accuracy, a 0.261 MB checkpoint and 67,642 parameters.
+- Checked the first convolution activation range over 100 calibration batches.
+- Calculated symmetric per-layer scales for convolution and linear weights.
+- Converted the four weight tensors from FP32 to `torch.int8`.
+- Confirmed that the raw INT8 weight tensors use one quarter of the FP32 weight storage (`4.0x` compression).
+
+### Current limitation
+
+- The INT8 tensors are not used for inference yet, so INT8 accuracy and latency are not available.
+
+### Next steps
+
+- Build an end-to-end quantized inference path.
+- Measure INT8 accuracy and CPU performance.
+- Compare the final FP32 and INT8 results.

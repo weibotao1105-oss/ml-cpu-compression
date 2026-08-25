@@ -2,22 +2,30 @@
 
 ## Aim
 
-This is a small learning project about running neural networks on a CPU. I am using a CNN trained on CIFAR-10 to compare a normal FP32 model with an INT8 quantized model.
-
-The main question is whether INT8 can reduce model size and improve inference speed without losing too much accuracy.
+This is a small learning project using a CIFAR-10 CNN to compare FP32 and INT8 inference on a CPU. The aim is to reduce model size and improve inference speed without losing too much accuracy.
 
 ## Current progress
 
-The FP32 part of the project is now mostly set up:
+The FP32 baseline is set up, and I have started a manual INT8 weight-quantization experiment:
 
 - `SmallCNN` is defined as a reusable PyTorch `nn.Module`.
 - `train.py` trains the model for two epochs and saves its weights.
-- Training and test accuracy are calculated separately.
-- `evaluate.py` loads the saved weights and evaluates the test set.
-- The evaluation records test accuracy, model size and parameter count.
-- FP32 results can be saved to `results/fp32_metrics.json`.
+- `evaluate.py` loads the checkpoint and records test accuracy, model size and parameter count.
+- `quantize.py` checks an activation range over 100 calibration batches.
+- Each convolution and linear layer has its own symmetric weight scale.
+- The raw INT8 weight tensors use one quarter of the FP32 weight storage (`4.0x` compression).
 
-INT8 quantization and CPU latency benchmarks have not been added yet.
+This is not an end-to-end INT8 inference model yet. The quantized tensors are not used for prediction, and CPU latency has not been benchmarked.
+
+## FP32 baseline
+
+| Metric | Result |
+| --- | ---: |
+| CIFAR-10 test accuracy | `54.1%` |
+| Saved model size | `0.261 MB` |
+| Number of parameters | `67,642` |
+
+The full values are stored in `results/fp32_metrics.json`.
 
 ## Model
 
@@ -47,32 +55,27 @@ New-Item -ItemType Directory -Force checkpoints, results
 
 ## Run
 
-Train and save the FP32 model first:
+Run the scripts in this order:
 
 ```powershell
 python src/train.py
-```
-
-Then load the checkpoint and evaluate it:
-
-```powershell
 python src/evaluate.py
+python src/quantize.py
 ```
 
-Both scripts display an example CIFAR-10 image with Matplotlib.
+The first command trains and saves the model, the second records the FP32 baseline, and the third runs the manual weight-quantization experiment. The training and evaluation scripts also display an example image with Matplotlib.
 
 ## Main files
 
 - `src/model.py` - the `SmallCNN` model.
 - `src/train.py` - data loading, training, accuracy checks and checkpoint saving.
 - `src/evaluate.py` - test-set evaluation and FP32 metrics.
-- `src/quantize.py` - planned INT8 quantization work.
+- `src/quantize.py` - activation-range checks and manual INT8 weight quantization.
 - `src/benchmark.py` - planned CPU benchmark work.
-- `hardware.md` - the machine used for the experiment.
-- `daily-log.md` - short notes on project progress.
 
 ## Next steps
 
-- Quantize the FP32 model to INT8.
+- Use quantized weights and activations during inference.
+- Measure INT8 test accuracy.
 - Measure batch-1 latency and batch-32 throughput.
 - Compare FP32 and INT8 accuracy, size and speed.

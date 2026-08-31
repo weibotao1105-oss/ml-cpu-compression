@@ -67,3 +67,40 @@
 - Build an end-to-end quantized inference path.
 - Measure INT8 accuracy and CPU performance.
 - Compare the final FP32 and INT8 results.
+
+## Day 5 — PTQ and compiled INT8 work
+
+### Work completed
+
+- Replaced the manual-only experiment with an end-to-end PT2E static quantization path.
+- Exported the trained `SmallCNN` with `torch.export` and configured `X86InductorQuantizer`.
+- Used `prepare_pt2e` to insert observers, then calibrated them with 100 batches (400 CIFAR-10 training images).
+- Converted the calibrated graph with `convert_pt2e` and ran quantized inference.
+- Evaluated both the FP32 and PT2E INT8 graphs on all 10,000 CIFAR-10 test images.
+- Added a `torch.compile` path and a numerical comparison between compiled and uncompiled quantized outputs.
+- Added an ignored VS Code terminal profile that enables UTF-8 mode, activates the project `.venv`, and attempts to initialize the MSVC x64 environment.
+
+### What I learned
+
+- Weight quantization can use statistics from fixed model parameters, while activation quantization needs representative calibration data.
+- `prepare_pt2e` inserts observers; calibration collects activation ranges; `convert_pt2e` rewrites the graph with quantize and dequantize operations.
+- A quantized model can use INT8 operations internally while still returning FP32 logits.
+- TorchInductor needs a working native C++ compiler environment to build CPU kernels on Windows.
+
+### Results
+
+- FP32 test accuracy: `54.1%`.
+- PT2E INT8 test accuracy: `54.2%`.
+- Difference from FP32: `+0.1` percentage points for INT8.
+- The quantized graph returned FP32 output with shape `[4, 10]`.
+- Raw layer weights require 270,176 bytes in FP32 and 67,544 bytes in INT8, a `4.0x` ratio. This is not a serialized INT8 model-size result.
+
+### Problems / fixes
+
+- TorchInductor previously encountered Windows GBK decoding problems, so the project terminal enables `PYTHONUTF8=1`.
+- The terminal profile was written to initialize MSVC and the project `.venv` together.
+- During fresh verification, `cl.exe` was not available and `torch.compile` stopped with `InvalidCxxCompiler`. The PT2E conversion and uncompiled INT8 evaluation still completed successfully, but compiled output could not be revalidated in the current environment.
+
+### Next step
+
+- Restore the MSVC x64 compiler environment, rerun the compiled/uncompiled output check, and then benchmark FP32 against compiled INT8 inference.

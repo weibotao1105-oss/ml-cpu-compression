@@ -1,61 +1,69 @@
-# CPU Inference After Neural Network Quantization
+# ML CPU Compression
 
-## Aim
+This project explores how INT8 post-training quantization affects a small image classifier running on a CPU. I built an FP32 baseline, converted it to a PT2E quantized graph, and compared accuracy and raw weight storage before starting CPU performance measurements.
 
-This is a small learning project using a CIFAR-10 CNN to compare FP32 and INT8 inference on a CPU. The aim is to reduce model size and improve inference speed without losing too much accuracy.
+## Goal
 
-## Current progress
+The main comparison is between the original FP32 `SmallCNN` and an INT8 post-training quantized (PTQ) version. I am measuring classification accuracy and weight storage first; CPU latency and throughput benchmarking are still in progress.
 
-The FP32 baseline is set up, and I have started a manual INT8 weight-quantization experiment:
+## Model and Dataset
 
-- `SmallCNN` is defined as a reusable PyTorch `nn.Module`.
-- `train.py` trains the model for two epochs and saves its weights.
-- `evaluate.py` loads the checkpoint and records test accuracy, model size and parameter count.
-- `quantize.py` checks an activation range over 100 calibration batches.
-- Each convolution and linear layer has its own symmetric weight scale.
-- The raw INT8 weight tensors use one quarter of the FP32 weight storage (`4.0x` compression).
+The model is trained and evaluated on CIFAR-10. `SmallCNN` has two convolution, ReLU, and max-pooling blocks, followed by a 64-unit fully connected layer and a 10-class output layer. Training uses `ToTensor`, batches of 4, cross-entropy loss, SGD, and two epochs.
 
-This is not an end-to-end INT8 inference model yet. The quantized tensors are not used for prediction, and CPU latency has not been benchmarked.
-
-## FP32 baseline
-
-| Metric | Result |
-| --- | ---: |
-| CIFAR-10 test accuracy | `54.1%` |
-| Saved model size | `0.261 MB` |
-| Number of parameters | `67,642` |
-
-The full values are stored in `results/fp32_metrics.json`.
-
-## Model
-
-The model is deliberately small so that it is easy to understand and run on a CPU:
+## Project Flow
 
 ```text
-3 x 32 x 32 image
--> Conv(3, 8) -> ReLU -> MaxPool
--> Conv(8, 16) -> ReLU -> MaxPool
--> Flatten
--> Linear(1024, 64) -> ReLU
--> Linear(64, 10)
+CIFAR-10
+-> SmallCNN
+-> FP32 training
+-> FP32 evaluation and checkpoint
+-> torch.export
+-> prepare_pt2e with X86InductorQuantizer
+-> calibration
+-> convert_pt2e
+-> INT8 quantized graph
+-> torch.compile
+-> CPU inference and benchmarking
 ```
 
-Training currently uses a batch size of `4`, cross-entropy loss, SGD and a learning rate of `0.01`.
+1. Train the FP32 model and save its `state_dict`.
+2. Evaluate the checkpoint and save the baseline metrics.
+3. Export the model to a PT2E graph with `torch.export`.
+4. Insert observers using `prepare_pt2e` and `X86InductorQuantizer`.
+5. Calibrate with 100 batches (400 CIFAR-10 training images).
+6. Convert the calibrated graph and evaluate it on the full test set.
+7. Compile the quantized graph with TorchInductor and compare compiled and uncompiled outputs.
+8. Benchmark FP32 and compiled INT8 inference on the CPU.
 
-## Setup
+## Current Results
 
-The recorded environment uses Windows 11, Python 3.14.6 and CPU-only PyTorch 2.13.0.
+| Metric | FP32 | PT2E INT8 |
+| --- | ---: | ---: |
+| CIFAR-10 test accuracy | 54.1% | 54.2% |
+| Difference from FP32 | - | +0.1 percentage points |
+| Raw layer-weight storage | 270,176 bytes | 67,544 bytes |
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-New-Item -ItemType Directory -Force checkpoints, results
-```
+The raw weight comparison gives a `4.0x` storage ratio because FP32 values use four bytes and INT8 values use one. It is not a measurement of a final serialized PT2E model. The FP32 checkpoint is 0.261 MB and the network has 67,642 parameters.
 
-## Run
+The uncompiled quantized graph currently runs and returns FP32 logits with shape `[4, 10]`. The `torch.compile` path and output comparison are implemented, but a fresh local run cannot reach compiled inference because `cl.exe` is not currently available. CPU latency benchmarking is currently in progress.
 
-Run the scripts in this order:
+## Repository Structure
+
+- `src/model.py` - defines `SmallCNN`.
+- `src/train.py` - trains the FP32 model and saves its checkpoint.
+- `src/evaluate.py` - evaluates the checkpoint and writes FP32 metrics.
+- `src/quantize.py` - exports, calibrates, converts, evaluates, and compiles the PT2E graph.
+- `src/benchmark.py` - placeholder for the CPU benchmark.
+- `results/` - saved experiment metrics.
+- `checkpoints/` - local model checkpoints (ignored by Git).
+- `daily-log.md` - learning and engineering progress.
+- `hardware.md` - recorded test environment.
+
+## Environment / CPU Quantization
+
+The project uses PyTorch, torchao, PT2E, `X86InductorQuantizer`, and TorchInductor through `torch.compile`. On Windows, TorchInductor CPU compilation also needs an MSVC x64 C++ toolchain and UTF-8 mode (`PYTHONUTF8=1`).
+
+Run the main scripts from the repository root:
 
 ```powershell
 python src/train.py
@@ -63,19 +71,8 @@ python src/evaluate.py
 python src/quantize.py
 ```
 
-The first command trains and saves the model, the second records the FP32 baseline, and the third runs the manual weight-quantization experiment. The training and evaluation scripts also display an example image with Matplotlib.
+## Next Step
 
-## Main files
-
-- `src/model.py` - the `SmallCNN` model.
-- `src/train.py` - data loading, training, accuracy checks and checkpoint saving.
-- `src/evaluate.py` - test-set evaluation and FP32 metrics.
-- `src/quantize.py` - activation-range checks and manual INT8 weight quantization.
-- `src/benchmark.py` - planned CPU benchmark work.
-
-## Next steps
-
-- Use quantized weights and activations during inference.
-- Measure INT8 test accuracy.
-- Measure batch-1 latency and batch-32 throughput.
-- Compare FP32 and INT8 accuracy, size and speed.
+- Restore the MSVC x64 compiler environment and re-check compiled INT8 output.
+- Benchmark batch-1 latency and throughput for FP32 and compiled INT8 inference.
+- Save the benchmark results.

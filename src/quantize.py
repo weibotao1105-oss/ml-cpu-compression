@@ -1,80 +1,92 @@
-import torch
-from model import SmallCNN
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+# import torch
+# from model import SmallCNN
+# from torchvision import datasets, transforms
+# from torch.utils.data import DataLoader
 
-# 让数据通过conv1然后查看activation 过后的shape
+# # 让数据通过conv1然后查看activation 过后的shape
 
-model = SmallCNN()
+# model = SmallCNN()
 
-transform = transforms.ToTensor()
+# transform = transforms.ToTensor()
 
-calibration_dataset = datasets.CIFAR10(
-    root="./data",
-    train=True,
-    download=True,
-    transform=transform
-)
+# calibration_dataset = datasets.CIFAR10(
+#     root="./data",
+#     train=True,
+#     download=True,
+#     transform=transform
+# )
 
-calibration_loader = DataLoader(
-    calibration_dataset,
-    batch_size=4,
-    shuffle=False
-)
+# calibration_loader = DataLoader(
+#     calibration_dataset,
+#     batch_size=4,
+#     shuffle=False
+# )
 
-# 使用更多的图片做calibration, 因为量化activation与weight不同， weight随机生成提取一次min 和max 就可以，而activation对不同的图片input出来的范围不一样
-# 先把最小值设成“正无穷”，这样第一批数据的任何真实最小值都会比它小
-activation_min = float("inf")
-# 同理对最大值
-activation_max = float("-inf")
+# # 使用更多的图片做calibration, 因为量化activation与weight不同， weight随机生成提取一次min 和max 就可以，而activation对不同的图片input出来的范围不一样
+# # 先把最小值设成“正无穷”，这样第一批数据的任何真实最小值都会比它小
+# activation_min = float("inf")
+# # 同理对最大值
+# activation_max = float("-inf")
 
-with torch.no_grad():
+# with torch.no_grad():
 
-    for batch_index, (images, labels) in enumerate(calibration_loader):
+#     for batch_index, (images, labels) in enumerate(calibration_loader):
 
-        activation = model.conv1(images)
+#         activation = model.conv1(images)
 
-        batch_min = activation.min().item()
-        batch_max = activation.max().item()
+#         batch_min = activation.min().item()
+#         batch_max = activation.max().item()
 
-        activation_min = min(
-            activation_min,
-            batch_min
-        )
+#         activation_min = min(
+#             activation_min,
+#             batch_min
+#         )
 
-        activation_max = max(
-            activation_max,
-            batch_max
-        )
+#         activation_max = max(
+#             activation_max,
+#             batch_max
+#         )
 
-        if batch_index == 99:
-            break
+#         if batch_index == 99:
+#             break
 
-print("Calibration activation min:", activation_min)
-print("Calibration activation max:", activation_max)
+# print("Calibration activation min:", activation_min)
+# print("Calibration activation max:", activation_max)
 
-# 计算scale
-activation_max_abs = max(
-    abs(activation_min),
-    abs(activation_max)
-)
+# # 计算scale
+# activation_max_abs = max(
+#     abs(activation_min),
+#     abs(activation_max)
+# )
 
-activation_scale = activation_max_abs / 127
+# activation_scale = activation_max_abs / 127
 
-print("Activation maximum absolute value:", activation_max_abs)
-print("Activation scale:", activation_scale)
+# print("Activation maximum absolute value:", activation_max_abs)
+# print("Activation scale:", activation_scale)
 
-#
-model.load_state_dict(
-    torch.load("checkpoints/fp32_model.pth")
-)
+# #
+# model.load_state_dict(
+#     torch.load("checkpoints/fp32_model.pth")
+# )
 
-model.eval()
+# model.eval()
 
-print("conv1 weight dtype:", model.conv1.weight.dtype)
-print("fc1 weight dtype:", model.fc1.weight.dtype)
+# print("conv1 weight dtype:", model.conv1.weight.dtype)
+# print("fc1 weight dtype:", model.fc1.weight.dtype)
 
-weights = model.conv1.weight
+# example_inputs = (
+#     torch.randn(4, 3, 32, 32),
+# )
+
+# exported_model = torch.export.export(
+#     model,
+#     example_inputs
+# ).module()
+
+# print("Model exported successfully.")
+# print(type(exported_model))
+
+# weights = model.conv1.weight
 
 # # item(), 把单个数值的tensor取成普通python 数字
 # # 找到weight 里最大和最小的然后映射到INT8的-127-127范围内
@@ -163,85 +175,267 @@ weights = model.conv1.weight
 # print("conv1 scale:", scale)
 
 # 将计算scale整合为一个函数
-def calculate_scale(weights):
-    min_weight = weights.min().item()
-    max_weight = weights.max().item()
+# def calculate_scale(weights):
+#     min_weight = weights.min().item()
+#     max_weight = weights.max().item()
 
-    max_abs = max(
-        abs(min_weight),
-        abs(max_weight)
+#     max_abs = max(
+#         abs(min_weight),
+#         abs(max_weight)
+#     )
+
+#     scale = max_abs / 127
+
+#     return scale
+
+# conv1_scale = calculate_scale(model.conv1.weight)
+# conv2_scale = calculate_scale(model.conv2.weight)
+# fc1_scale = calculate_scale(model.fc1.weight)
+# fc2_scale = calculate_scale(model.fc2.weight)
+
+# print("conv1 scale:", conv1_scale)
+# print("conv2 scale:", conv2_scale)
+# print("fc1 scale:", fc1_scale)
+# print("fc2 scale:", fc2_scale)
+
+# # 量化函数
+# def quantize_weights(weights, scale):
+
+#     quantized = torch.round(
+#         weights / scale
+#     )
+#     # 将数据clamp在-127到127之间
+#     quantized = quantized.clamp(
+#         -127,
+#         127
+#     )
+
+#     quantized = quantized.to(torch.int8)
+
+#     return quantized
+
+# conv1_quantized = quantize_weights(
+#     model.conv1.weight,
+#     conv1_scale
+# )
+
+# conv2_quantized = quantize_weights(
+#     model.conv2.weight,
+#     conv2_scale
+# )
+
+# fc1_quantized = quantize_weights(
+#     model.fc1.weight,
+#     fc1_scale
+# )
+
+# fc2_quantized = quantize_weights(
+#     model.fc2.weight,
+#     fc2_scale
+# )
+
+# fp32_weight_bytes = sum(
+#     layer.weight.numel() * layer.weight.element_size()
+#     for layer in [
+#         model.conv1,
+#         model.conv2,
+#         model.fc1,
+#         model.fc2
+#     ]
+# )
+
+# int8_weight_bytes = sum(
+#     weights.numel() * weights.element_size()
+#     for weights in [
+#         conv1_quantized,
+#         conv2_quantized,
+#         fc1_quantized,
+#         fc2_quantized
+#     ]
+# )
+
+# print("FP32 weight size:", fp32_weight_bytes, "bytes")
+# print("INT8 weight size:", int8_weight_bytes, "bytes")
+# print("Compression ratio:", fp32_weight_bytes / int8_weight_bytes)
+import torch
+from model import SmallCNN
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
+
+model = SmallCNN()
+
+model.load_state_dict(
+    torch.load("checkpoints/fp32_model.pth")
+)
+
+model.eval()
+
+example_inputs = (
+    torch.randn(4, 3, 32, 32),
+)
+
+exported_model = torch.export.export(
+    model,
+    example_inputs
+).module()
+
+print("Model exported successfully.")
+print(type(exported_model))
+
+from torchao.quantization.pt2e.quantize_pt2e import (
+    prepare_pt2e,
+    convert_pt2e
+)
+
+import torchao.quantization.pt2e.quantizer.x86_inductor_quantizer as xiq
+
+from torchao.quantization.pt2e.quantizer.x86_inductor_quantizer import (
+    X86InductorQuantizer
+)
+
+# Quantization math (FP32 -> INT8) is mostly hardware-independent,
+# but efficient INT8 inference depends on the CPU backend and its supported instructions/kernels.
+
+#告诉 PyTorch，我们最终想在x86CPU上运行量化模型
+quantizer = X86InductorQuantizer()
+
+# 获取x86后端的默认量化配置
+quantizer.set_global(
+    xiq.get_default_x86_inductor_quantization_config()
+)
+
+# 在模型graph中适当的位置插入observers
+# observer 可看作一个测量仪，在图片跑过模型的时候，这些observer会记录：
+# 这里的 activation 大概最小是多少？
+# 最大是多少？
+# 分布范围是什么？
+prepared_model = prepare_pt2e(
+    exported_model,
+    quantizer
+)
+
+transform = transforms.ToTensor()
+
+calibration_dataset = datasets.CIFAR10(
+    root="./data",
+    train=True,
+    download=True,
+    transform=transform
+)
+
+calibration_loader = DataLoader(
+    calibration_dataset,
+    batch_size=4,
+    shuffle=False
+)
+
+with torch.no_grad():
+    # 这里CIFAR-10 每个 sample 都会给image + label
+    for batch_index, (images, _) in enumerate(calibration_loader):
+
+        prepared_model(images)
+
+        if batch_index == 99:
+            break
+
+print("Calibration completed.")
+
+# 会读取 calibration 阶段 observers 收集到的统计信息，然后把原来的 prepared graph 改写成带有 quantize/dequantize 操作的 quantized graph
+quantized_model = convert_pt2e(prepared_model)
+
+print("Model converted to quantized graph.")
+
+# 从loader里拿一个batch, _ 仍然表示 label 这里暂时不用。
+test_images, _ = next(iter(calibration_loader))
+
+with torch.no_grad():
+    quantized_output = quantized_model(test_images)
+
+print("Quantized output shape:", quantized_output.shape)
+
+# 模型内部可以使用 INT8 quantization，但模型最终输出 logits 仍然可以是 FP32
+print("Quantized output dtype:", quantized_output.dtype)
+
+# Calibration only collects activation statistics; convert_pt2e() uses them to rewrite the model into a quantized graph.
+
+# 测量完整 INT8 quantized model 在 10,000 张 CIFAR-10 test images 上的 accuracy
+test_dataset = datasets.CIFAR10(
+    root="./data",
+    train=False,
+    download=True,
+    transform=transform
+)
+
+test_loader = DataLoader(
+    test_dataset,
+    batch_size=4,
+    shuffle=False
+)
+
+# 提取最初FP32模型
+fp32_correct = 0
+fp32_total = 0
+
+with torch.no_grad():
+
+    for images, labels in test_loader:
+
+        output = model(images)
+
+        predicted = torch.argmax(output, dim=1)
+
+        fp32_correct += (predicted == labels).sum().item()
+        fp32_total += labels.size(0)
+
+fp32_accuracy = fp32_correct / fp32_total * 100
+
+# INT8模型
+correct = 0
+total = 0
+
+with torch.no_grad():
+
+    for images, labels in test_loader:
+        # 这里不再使用原始 FP32 model，而是你刚刚 convert_pt2e() 得到的量化模型
+        output = quantized_model(images)
+
+        predicted = torch.argmax(output, dim=1)
+
+        correct += (predicted == labels).sum().item()
+        total += labels.size(0)
+
+quantized_accuracy = correct / total
+
+
+int8_accuracy = quantized_accuracy * 100
+
+accuracy_drop = fp32_accuracy - int8_accuracy
+
+print("FP32 accuracy (%):", fp32_accuracy)
+print("INT8 accuracy (%):", int8_accuracy)
+print("Accuracy drop (percentage points):", accuracy_drop)
+
+# 开始真正针对CPU编译
+compiled_int8_model = torch.compile(quantized_model)
+
+with torch.no_grad():
+    compiled_output = compiled_int8_model(test_images)
+
+print("Compiled output shape:", compiled_output.shape)
+
+with torch.no_grad():
+    uncompiled_output = quantized_model(test_images)
+
+difference = torch.abs(
+    compiled_output - uncompiled_output
+)
+
+print("Maximum output difference:", difference.max().item())
+print(
+    "Outputs close:",
+    torch.allclose(
+        compiled_output,
+        uncompiled_output,
+        atol=1e-5
     )
-
-    scale = max_abs / 127
-
-    return scale
-
-conv1_scale = calculate_scale(model.conv1.weight)
-conv2_scale = calculate_scale(model.conv2.weight)
-fc1_scale = calculate_scale(model.fc1.weight)
-fc2_scale = calculate_scale(model.fc2.weight)
-
-print("conv1 scale:", conv1_scale)
-print("conv2 scale:", conv2_scale)
-print("fc1 scale:", fc1_scale)
-print("fc2 scale:", fc2_scale)
-
-# 量化函数
-def quantize_weights(weights, scale):
-
-    quantized = torch.round(
-        weights / scale
-    )
-    # 将数据clamp在-127到127之间
-    quantized = quantized.clamp(
-        -127,
-        127
-    )
-
-    quantized = quantized.to(torch.int8)
-
-    return quantized
-
-conv1_quantized = quantize_weights(
-    model.conv1.weight,
-    conv1_scale
 )
-
-conv2_quantized = quantize_weights(
-    model.conv2.weight,
-    conv2_scale
-)
-
-fc1_quantized = quantize_weights(
-    model.fc1.weight,
-    fc1_scale
-)
-
-fc2_quantized = quantize_weights(
-    model.fc2.weight,
-    fc2_scale
-)
-
-fp32_weight_bytes = sum(
-    layer.weight.numel() * layer.weight.element_size()
-    for layer in [
-        model.conv1,
-        model.conv2,
-        model.fc1,
-        model.fc2
-    ]
-)
-
-int8_weight_bytes = sum(
-    weights.numel() * weights.element_size()
-    for weights in [
-        conv1_quantized,
-        conv2_quantized,
-        fc1_quantized,
-        fc2_quantized
-    ]
-)
-
-print("FP32 weight size:", fp32_weight_bytes, "bytes")
-print("INT8 weight size:", int8_weight_bytes, "bytes")
-print("Compression ratio:", fp32_weight_bytes / int8_weight_bytes)

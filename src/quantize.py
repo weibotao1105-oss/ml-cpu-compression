@@ -257,6 +257,10 @@
 # print("FP32 weight size:", fp32_weight_bytes, "bytes")
 # print("INT8 weight size:", int8_weight_bytes, "bytes")
 # print("Compression ratio:", fp32_weight_bytes / int8_weight_bytes)
+from datetime import datetime
+import glob
+import statistics
+
 import torch
 from model import SmallCNN
 from torchvision import datasets, transforms
@@ -274,9 +278,20 @@ example_inputs = (
     torch.randn(4, 3, 32, 32),
 )
 
+# 应用dynamic shape
+
+batch_dim = torch.export.Dim(
+    "batch",
+    min=1,
+    max=32
+)
+
 exported_model = torch.export.export(
     model,
-    example_inputs
+    example_inputs,
+    dynamic_shapes={
+        "x": {0: batch_dim}  #对于输入 x，把它的第 0 维设置成一个允许 1～32 变化的动态维度
+    }
 ).module()
 
 print("Model exported successfully.")
@@ -439,3 +454,188 @@ print(
         atol=1e-5
     )
 )
+# FP32 compiled model
+compiled_fp32_model = torch.compile(model)
+
+import time
+
+def benchmark_model(model, input_tensor):
+    # Warm up
+    with torch.no_grad():
+        for _ in range(20):
+            model(input_tensor)
+
+    start = time.perf_counter()
+
+    with torch.no_grad():
+        for _ in range(1000):
+            model(input_tensor)
+
+    end = time.perf_counter()
+
+    average_time = (end - start) / 1000
+
+    return average_time
+
+def latency_comparison(fp32model, int8model, input, batch_size):
+    fp32_latency_list = []
+    int8_latency_list = []
+    for run in range(5):
+        fp32_time = benchmark_model(
+            fp32model,
+            input
+        )
+        fp32_latency_list.append(fp32_time)
+
+        int8_time = benchmark_model(
+            int8model,
+            input
+        )
+        int8_latency_list.append(int8_time)
+
+        print(
+            f"Run {run+1}:"
+            f"FP32 = {fp32_time * 1000:.4f} ms,"
+            f"INT8 = {int8_time * 1000:.4f} ms"
+        )
+
+    fp32_latency_mean = (sum(fp32_latency_list) / len(fp32_latency_list)) * 1000
+    int8_latency_mean = (sum(int8_latency_list) / len(int8_latency_list)) * 1000
+
+    fp32_median = statistics.median(fp32_latency_list) * 1000
+    int8_median = statistics.median(int8_latency_list) * 1000
+
+
+    fp32_throughput = batch_size/(fp32_latency_mean/1000)
+    int8_throughput = batch_size/(int8_latency_mean/1000)
+
+    print(f"FP32 batch size {batch_size} mean latency: {fp32_latency_mean:.4f} ms")
+    print(f"INT8 batch size {batch_size} mean latency: {int8_latency_mean:.4f} ms")
+
+    print(f"FP32 latency median: {fp32_median:.2f} ms")
+    print(f"INT8 latency median: {int8_median:.2f} ms")
+
+    print(f"INT8 slower by:{(int8_latency_mean - fp32_latency_mean) / fp32_latency_mean * 100:.4f} %")
+
+    print(f"FP32 throughput: {fp32_throughput:.2f} per second")
+    print(f"INT8 throughput: {int8_throughput:.2f} per second")
+
+    return fp32_latency_mean, fp32_median, int8_latency_mean, int8_median, fp32_throughput, int8_throughput
+
+def take_batches(n):
+    batch_list = []
+    loader_iter = iter(test_loader)
+
+    for _ in range(n):
+        batch = next(loader_iter)
+        images = batch[0]
+        batch_list.append(images)
+
+    combined_batch = torch.cat(batch_list, dim=0)
+    return combined_batch
+
+def results_collect(fp32_latency_mean, fp32_latency_median, int8_latency_mean, int8_latency_median, fp32_throughput, int8_throughput, batch_size, result_list):
+    data_dic = {
+        "batch_size": batch_size,
+        "fp32_latency_mean_ms" : fp32_latency_mean,
+        "fp32_latency_median_ms" : fp32_latency_median,
+        "fp32_throughput": fp32_throughput,
+        "int8_latency_mean_ms" : int8_latency_mean,
+        "int8_latency_median_ms" : int8_latency_median,
+        "int8_throughput": int8_throughput
+    }
+    result_list.append(data_dic)
+
+results_list = []
+# batch size = 1
+batch1_input = test_images[:1]
+print("Batch size = 1:")
+fp32_latency_mean, fp32_latency_median, int8_latency_mean, int8_latency_median, fp32_throughput, int8_throughput = latency_comparison(compiled_fp32_model, compiled_int8_model, batch1_input, 1)
+results_collect(fp32_latency_mean, fp32_latency_median, int8_latency_mean, int8_latency_median, fp32_throughput, int8_throughput, 1, results_list)
+
+# batch size = 4
+size4_batch = take_batches(1)
+print("Batch size = 4:")
+fp32_latency_mean, fp32_latency_median, int8_latency_mean, int8_latency_median, fp32_throughput, int8_throughput = latency_comparison(compiled_fp32_model, compiled_int8_model, size4_batch, 4)
+results_collect(fp32_latency_mean, fp32_latency_median, int8_latency_mean, int8_latency_median, fp32_throughput, int8_throughput, 4, results_list)
+
+# batch size = 8
+size8_batch = take_batches(2)
+print("Batch size = 8:")
+fp32_latency_mean, fp32_latency_median, int8_latency_mean, int8_latency_median, fp32_throughput, int8_throughput = latency_comparison(compiled_fp32_model, compiled_int8_model, size8_batch, 8)
+results_collect(fp32_latency_mean, fp32_latency_median, int8_latency_mean, int8_latency_median, fp32_throughput, int8_throughput, 8, results_list)
+
+# batch size = 16
+print("Batch size = 16")
+size16_batch = take_batches(4)
+fp32_latency_mean, fp32_latency_median, int8_latency_mean, int8_latency_median, fp32_throughput, int8_throughput = latency_comparison(compiled_fp32_model, compiled_int8_model, size16_batch, 16)
+results_collect(fp32_latency_mean, fp32_latency_median, int8_latency_mean, int8_latency_median, fp32_throughput, int8_throughput, 16, results_list)
+
+# batch size = 32
+print("Batch size = 32")
+size32_batch = take_batches(8)
+fp32_latency_mean, fp32_latency_median, int8_latency_mean, int8_latency_median, fp32_throughput, int8_throughput = latency_comparison(compiled_fp32_model, compiled_int8_model, size32_batch, 32)
+results_collect(fp32_latency_mean, fp32_latency_median, int8_latency_mean, int8_latency_median, fp32_throughput, int8_throughput, 32, results_list)
+print(results_list)
+
+import json
+
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+filename = f"results/benchmark_{timestamp}.json"
+
+with open(filename, "w") as file:
+    json.dump(results_list, file, indent=4)
+
+# 返回值是一个list
+files = glob.glob("results/benchmark_*.json")
+files = sorted(files)
+
+with open(files[0], "r") as file:
+    data = json.load(file)
+
+def json_data_load(files, batch_size, stats_type):
+    fp32_runs = []
+    int8_runs = []
+    fp32_key = f"fp32_{stats_type}"
+    int8_key = f"int8_{stats_type}"
+
+    for filename in files:
+        with open(filename, "r") as file:
+            data = json.load(file)
+        for results in data:
+            if results["batch_size"] == batch_size:
+                fp32_runs.append(results[fp32_key])
+                int8_runs.append(results[int8_key])
+    return fp32_runs, int8_runs
+
+def generate_stats(files, batch_size, stats_type):
+    fp32_runs, int8_runs = json_data_load(files, batch_size, stats_type)
+
+    fp32_mean = statistics.mean(fp32_runs)
+    fp32_median = statistics.median(fp32_runs)
+    fp32_std = statistics.stdev(fp32_runs)
+
+    int8_mean = statistics.mean(int8_runs)
+    int8_median = statistics.median(int8_runs)
+    int8_std = statistics.stdev(int8_runs)
+
+    print(f"FP32 {stats_type}:\n{fp32_mean:.2f}\n{fp32_median:.2f}\n{fp32_std:.2f}")
+
+    print(f"INT8 {stats_type}:\n{int8_mean:.2f}\n{int8_median:.2f}\n{int8_std:.2f}")
+
+def slowdown_percentage(files, batch_size, stats_type):
+    fp32_runs, int8_runs = json_data_load(files, batch_size, stats_type)
+    slowdown_percentages = []
+
+    for fp32_time, int8_time in zip(fp32_runs, int8_runs):
+        slow_p = ((int8_time - fp32_time) / fp32_time) * 100
+        slowdown_percentages.append(slow_p)
+
+    slow_mean = statistics.mean(slowdown_percentages)
+    slow_median = statistics.median(slowdown_percentages)
+    slow_std = statistics.stdev(slowdown_percentages)
+
+    print(f"INT8 slowdown stats:\n mean: {slow_mean:.2f}%\n median: {slow_median:.2f}%\n std: {slow_std:.2f}%")
+
+    return slow_mean, slow_median, slow_std, slowdown_percentages

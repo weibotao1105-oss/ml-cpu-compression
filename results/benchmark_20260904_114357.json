@@ -1,0 +1,47 @@
+[
+    {
+        "batch_size": 1,
+        "fp32_latency_mean_ms": 0.13616202000994235,
+        "fp32_latency_median_ms": 0.13854660000652075,
+        "fp32_throughput": 7344.191867357589,
+        "int8_latency_mean_ms": 0.20316631998866796,
+        "int8_latency_median_ms": 0.20436899998458102,
+        "int8_throughput": 4922.0756671468835
+    },
+    {
+        "batch_size": 4,
+        "fp32_latency_mean_ms": 0.22342252001399174,
+        "fp32_latency_median_ms": 0.22158509999280795,
+        "fp32_throughput": 17903.298198182983,
+        "int8_latency_mean_ms": 0.2617643399978988,
+        "int8_latency_median_ms": 0.26132890000008047,
+        "int8_throughput": 15280.92023547634
+    },
+    {
+        "batch_size": 8,
+        "fp32_latency_mean_ms": 0.2876070400001481,
+        "fp32_latency_median_ms": 0.2833570000366308,
+        "fp32_throughput": 27815.73079711776,
+        "int8_latency_mean_ms": 0.3190863600000739,
+        "int8_latency_median_ms": 0.31279840000206605,
+        "int8_throughput": 25071.58250198519
+    },
+    {
+        "batch_size": 16,
+        "fp32_latency_mean_ms": 0.37444402001565325,
+        "fp32_latency_median_ms": 0.36327600001823157,
+        "fp32_throughput": 42730.01876043083,
+        "int8_latency_mean_ms": 0.4341126599931158,
+        "int8_latency_median_ms": 0.4200540999881923,
+        "int8_throughput": 36856.79196790466
+    },
+    {
+        "batch_size": 32,
+        "fp32_latency_mean_ms": 0.46270721999462694,
+        "fp32_latency_median_ms": 0.4685470000258647,
+        "fp32_throughput": 69158.20332427835,
+        "int8_latency_mean_ms": 0.6247031399863772,
+        "int8_latency_median_ms": 0.6304346999968402,
+        "int8_throughput": 51224.33032863869
+    }
+]
